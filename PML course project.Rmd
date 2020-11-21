@@ -1,0 +1,118 @@
+---
+title: "PML project"
+author: "NH Forensic"
+date: "16/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This report sets out my review of the personal activity data obtained from 6 participants that performed dumbell lifts while using movement sensors attached to their bodies. 
+
+The first step of my review is to load the relevant data and the necessary R package into my R work space:
+
+
+```{r r package and data}
+library(caret)
+library(rattle)
+Data <- read.csv("pml-training.csv")
+testData <- read.csv("pml-testing.csv")
+```
+
+I then split the training data further between a training data set and a validation data set and review the high level features of the training data set:
+
+```{r data split}
+set.seed(1111)
+trainDatatemp <- createDataPartition(y=Data$classe, p=0.7, list = FALSE)
+trainData <- Data[trainDatatemp, ]
+valData <- Data[-trainDatatemp, ]
+dim(trainData)
+```
+
+The above shows that there are 160 variables in the data set. The following functionremoves variables that have very few unique values relative to the number of samples:
+
+```{r nearZeroVar}
+nouniqueval <- nearZeroVar(trainData)
+trainData1 <- trainData[, -nouniqueval]
+valData1 <- valData[, -nouniqueval]
+dim(trainData1)
+```
+
+The above shows that the number of variables decreased to 107. My review of the CSV file also shows that the data set has many variables that have NAs. The following function removes the variables that contain mostly NAs  
+
+```{r remove NAs}
+NAvariables <- sapply(trainData1, function(x) mean(is.na(x))) > 0.90
+trainData2 <- trainData1[, NAvariables==F]
+valData2 <- valData1[, NAvariables==F]
+dim(trainData2)
+```
+
+The above shows that the number of variables decreased to 59. We then remove the first 7 variables given that these do not appear to influence the outcome:
+
+```{r remove first 7 variables}
+trainData3 <- trainData2[, -(1:7)]
+valData3 <- valData2[, -(1:7)]
+dim(trainData3)
+```
+
+The above shows that the number of variables decreased to 47. 
+
+## Model
+
+I  now build a model based on the amended data set. In this instance, I have used the following models:
+
+1) Randon Forests
+2) Decision Trees
+
+### Random forests
+
+I start with Random Forests, as follows:
+
+```{r random forest model}
+RF <- train(classe ~., data = trainData3, method = "rf")
+RF$finalModel
+```
+
+I then check the accuracy of the model, as follows:
+
+```{r random forest validation}
+RFpredict <- predict(RF, valData3)
+RFcheck <- confusionMatrix(RFpredict, valData3$classe)
+RFcheck
+```
+
+The above shows that the accurancy is .9941.
+
+### Decision trees
+
+I then create a model based on decision trees, as follows:
+
+```{r decision trees model}
+DT <- train(classe ~., data = trainData3, method = "rpart")
+fancyRpartPlot(DT$finalModel)
+DT$finalModel
+```
+
+I then check the accuracy of the model, as follows:
+
+```{r decision trees validation}
+DTpredict <- predict(DT, valData3)
+DTcheck <- confusionMatrix(DTpredict, valData3$classe)
+DTcheck
+```
+
+The above shows that the accuracy is only .4867. Accordingly, I will rely upon the Random Forests model for the purpose of my prediction.
+
+## Prediction
+
+I will now use the Random Forest model to predict "classe" based on the data contained in the "pml-testing.csv" data set, as follows:
+
+```{r prediction}
+NHprediction <- predict(RF, testData)
+NHprediction
+```
+
